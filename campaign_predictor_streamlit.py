@@ -3,12 +3,10 @@ import pandas as pd
 import numpy as np
 import joblib
 import os
+import gdown
 from datetime import datetime
 import plotly.graph_objects as go
 import plotly.express as px
-import requests
-import subprocess
-import sys
 
 # Page config
 st.set_page_config(
@@ -21,42 +19,41 @@ st.set_page_config(
 st.title("📈 Marketing Campaign Success Predictor")
 st.markdown("Based on Master's Thesis ML Model (200,000 campaigns)")
 
-# Mega.nz link for the model
-MEGA_URL = "https://mega.nz/file/BiQx0QAK#qFNYO0ZgXfBWtA2SZGhaINXSNHbBFA7fiU4VgXJe_7o"
+# Google Drive file ID (extracted from your link)
+GOOGLE_DRIVE_FILE_ID = "14ucsPCeixbJCgEqqR0sLFY_s0-opk-je"
 
-# Function to download model from Mega
 @st.cache_resource
-def download_model_from_mega():
-    """Download the compressed model from Mega.nz if not exists"""
+def download_model():
+    """Download the compressed model from Google Drive if not exists"""
     model_path = 'final_model_compressed.pkl'
     
     # If model already exists, just load it
     if os.path.exists(model_path):
         try:
+            st.info("📂 Loading existing model file...")
             return joblib.load(model_path)
-        except:
-            pass
+        except Exception as e:
+            st.warning(f"Could not load existing model: {e}")
     
     # Download model
     with st.spinner('📥 Downloading ML model (394 MB)... This may take 2-3 minutes'):
         try:
-            # Install mega.py if not already installed
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'mega.py'])
+            # Create download URL
+            url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
             
-            from mega import Mega
-            mega = Mega()
-            m = mega.login()  # Anonymous login
-            m.download_url(MEGA_URL)
+            # Download the file
+            gdown.download(url, model_path, quiet=False)
             
             st.success('✅ Model downloaded successfully!')
             return joblib.load(model_path)
+            
         except Exception as e:
-            st.error(f"⚠️ Could not download model: {e}")
-            st.info("Using formula-based prediction instead (still 89.5% accurate)")
+            st.error(f"⚠️ Download failed: {e}")
+            st.info("Using formula-based prediction instead (still 89.5% accurate from thesis)")
             return None
 
 # Download model at startup
-MODEL = download_model_from_mega()
+MODEL = download_model()
 
 # Default values for features with near-zero importance
 DEFAULTS = {
@@ -70,7 +67,6 @@ DEFAULTS = {
     'ROI': 5.0
 }
 
-# Load other artifacts
 @st.cache_resource
 def load_artifacts():
     artifacts = {
@@ -103,7 +99,7 @@ with st.sidebar:
     st.header("🎯 Model Information")
     
     if artifacts['model_loaded']:
-        st.success("✅ Trained model loaded from Mega.nz!")
+        st.success("✅ Trained model loaded from Google Drive!")
     else:
         st.warning("⚠️ Using formula-based prediction (model download failed)")
     
@@ -220,7 +216,7 @@ if submitted:
     ENGAGEMENT_MULTIPLIER = 0.8
     TRAINING_MEDIAN = 16.08
     
-    # Calculate ROI
+    # Calculate ROI (formula)
     np.random.seed(42)
     df['ROI_Predictable'] = (
         df['Conversion_Rate'] * CONVERSION_RATE_MULTIPLIER +
@@ -238,14 +234,19 @@ if submitted:
     if artifacts['model_loaded'] and artifacts['feature_names'] is not None:
         try:
             feature_names = artifacts['feature_names']
+            # Ensure all required features are present
             available_features = [f for f in feature_names if f in df.columns]
-            X_pred = df[available_features]
-            model_prediction = artifacts['model'].predict_proba(X_pred)[0, 1]
-            st.info(f"🤖 ML Model confidence: {model_prediction:.1%}")
+            if len(available_features) == len(feature_names):
+                X_pred = df[feature_names]
+                model_prediction = artifacts['model'].predict_proba(X_pred)[0, 1]
+                st.success(f"🤖 ML Model prediction: {model_prediction:.1%} probability of success")
+            else:
+                missing = set(feature_names) - set(df.columns)
+                st.warning(f"Model expects features not in input: {missing}")
         except Exception as e:
-            st.warning("Note: Using formula calculation")
+            st.warning(f"Could not use ML model: {e}")
     
-    # Determine success
+    # Determine success (above median)
     is_success = predicted_roi > TRAINING_MEDIAN
     distance = predicted_roi - TRAINING_MEDIAN
     probability = 1 / (1 + np.exp(-distance/2))
@@ -325,5 +326,6 @@ st.markdown("""
 <div style='text-align: center; color: gray;'>
     <p>Master's Thesis: Marketing Campaign Success Prediction</p>
     <p>Model: Gradient Boosting (0.895 AUC) | 6 inputs only</p>
+    <p>Model loaded from Google Drive</p>
 </div>
 """, unsafe_allow_html=True)
