@@ -1,4 +1,4 @@
-# Force rebuild - v4
+# Force rebuild - v5 with memory fixes
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,6 +8,11 @@ import gdown
 from datetime import datetime
 import plotly.graph_objects as go
 import plotly.express as px
+import tracemalloc
+import gc
+
+# Start tracing memory
+tracemalloc.start()
 
 # Page config
 st.set_page_config(
@@ -32,12 +37,18 @@ def download_model():
     if os.path.exists(model_path):
         try:
             st.info("📂 Loading existing model file...")
-            return joblib.load(model_path)
+            # Force garbage collection before loading
+            gc.collect()
+            model = joblib.load(model_path)
+            # Check memory usage
+            current, peak = tracemalloc.get_traced_memory()
+            st.caption(f"✅ Model loaded. Memory usage: {peak / 10**6:.1f} MB")
+            return model
         except Exception as e:
             st.warning(f"Could not load existing model: {e}")
     
     # Download model
-    with st.spinner('📥 Downloading ML model (394 MB)... This may take 2-3 minutes'):
+    with st.spinner('📥 Downloading ML model (414 MB)... This may take 2-3 minutes'):
         try:
             # Create download URL
             url = f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}"
@@ -46,7 +57,16 @@ def download_model():
             gdown.download(url, model_path, quiet=False)
             
             st.success('✅ Model downloaded successfully!')
-            return joblib.load(model_path)
+            
+            # Force garbage collection before loading
+            gc.collect()
+            model = joblib.load(model_path)
+            
+            # Check memory usage
+            current, peak = tracemalloc.get_traced_memory()
+            st.caption(f"✅ Model loaded. Memory usage: {peak / 10**6:.1f} MB")
+            
+            return model
             
         except Exception as e:
             st.error(f"⚠️ Download failed: {e}")
@@ -101,6 +121,9 @@ with st.sidebar:
     
     if artifacts['model_loaded']:
         st.success("✅ Trained model loaded from Google Drive!")
+        # Show memory info
+        current, peak = tracemalloc.get_traced_memory()
+        st.caption(f"💾 Peak memory: {peak / 10**6:.1f} MB")
     else:
         st.warning("⚠️ Using formula-based prediction (model download failed)")
     
@@ -327,6 +350,6 @@ st.markdown("""
 <div style='text-align: center; color: gray;'>
     <p>Master's Thesis: Marketing Campaign Success Prediction</p>
     <p>Model: Gradient Boosting (0.895 AUC) | 6 inputs only</p>
-    <p>Model loaded from Google Drive</p>
+    <p>Model loaded from Google Drive with memory optimization</p>
 </div>
 """, unsafe_allow_html=True)
