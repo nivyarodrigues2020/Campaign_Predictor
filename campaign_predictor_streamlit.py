@@ -28,8 +28,10 @@ st.title("📈 Marketing Campaign Success Predictor")
 st.markdown("Based on Master's Thesis ML Model (200,000 campaigns)")
 
 # Google Drive model file ID
-GOOGLE_DRIVE_FILE_ID = "14ucsPCeixbJCgEqqR0sLFY_s0-opk-je"
-MODEL_FILE_NAME = "final_model_compressed.pkl"
+#GOOGLE_DRIVE_FILE_ID = "14ucsPCeixbJCgEqqR0sLFY_s0-opk-je"
+#MODEL_FILE_NAME = "final_model_compressed.pkl"
+GOOGLE_DRIVE_FILE_ID = "1oJf8rdGMmYFzxzhAis4-VP0WusYV05pw"
+MODEL_FILE_NAME = "final_model_for_render.pkl"
 
 @st.cache_resource
 def download_model():
